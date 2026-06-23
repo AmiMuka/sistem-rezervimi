@@ -11,6 +11,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const jwt = require('jsonwebtoken');
+
+// Mock eAlbania login — simulon autentikimin
+app.post('/api/auth/mock-login', async (req, res) => {
+  try {
+    const { emer, mbiemer, email, numriID } = req.body;
+
+    if (!emer || !mbiemer || !email || !numriID) {
+      return res.status(400).json({ error: 'Të gjitha fushat janë të detyrueshme' });
+    }
+
+    // Gjen anëtarin nëse ekziston, ose e krijon
+    let anetar = await prisma.anetar.findUnique({ where: { email } });
+
+    if (!anetar) {
+      anetar = await prisma.anetar.create({
+        data: { emer, mbiemer, email, numriID },
+      });
+    }
+
+    // Krijon JWT token
+    const token = jwt.sign(
+      { id: anetar.id, email: anetar.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ token, anetar });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në autentikim' });
+  }
+});
+
 // Test bazë
 app.get('/', (req, res) => {
   res.send('Backend po punon!');
