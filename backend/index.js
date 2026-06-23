@@ -45,6 +45,63 @@ app.post('/api/auth/mock-login', async (req, res) => {
   }
 });
 
+// Krijo një rezervim
+app.post('/api/rezervime', async (req, res) => {
+  try {
+    const { anetarId, vendId, data, oraFillimit, oraMbarimit } = req.body;
+
+    if (!anetarId || !vendId || !data || !oraFillimit || !oraMbarimit) {
+      return res.status(400).json({ error: 'Të gjitha fushat janë të detyrueshme' });
+    }
+
+    // Kontrollo që vendi ekziston dhe është i lirë
+    const vend = await prisma.vend.findUnique({ where: { id: vendId } });
+    if (!vend) {
+      return res.status(404).json({ error: 'Vendi nuk ekziston' });
+    }
+    if (vend.status !== 'i_lire') {
+      return res.status(409).json({ error: 'Vendi nuk është i lirë' });
+    }
+
+    // Krijo rezervimin
+    const rezervim = await prisma.rezervim.create({
+      data: {
+        anetarId,
+        vendId,
+        data: new Date(data),
+        oraFillimit: new Date(oraFillimit),
+        oraMbarimit: new Date(oraMbarimit),
+      },
+    });
+
+    // Ndrysho statusin e vendit
+    await prisma.vend.update({
+      where: { id: vendId },
+      data: { status: 'rezervuar' },
+    });
+
+    res.json(rezervim);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në krijimin e rezervimit', detaje: err.message });
+  }
+});
+
+// Merr rezervimet e një anëtari
+app.get('/api/rezervime/:anetarId', async (req, res) => {
+  try {
+    const rezervime = await prisma.rezervim.findMany({
+      where: { anetarId: parseInt(req.params.anetarId) },
+      include: { vend: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(rezervime);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në marrjen e rezervimeve' });
+  }
+});
+
 // Test bazë
 app.get('/', (req, res) => {
   res.send('Backend po punon!');
