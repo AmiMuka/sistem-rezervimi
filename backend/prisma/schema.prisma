@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Anetar {
+  id          Int           @id @default(autoincrement())
+  emer        String
+  mbiemer     String
+  email       String        @unique
+  numriID     String        @unique
+  penalitete  Float         @default(0)
+  rezervime   Rezervim[]
+  createdAt   DateTime      @default(now())
+}
+
+model Vend {
+  id          Int           @id @default(autoincrement())
+  kodi        String        @unique
+  salla       String
+  status      String        @default("i_lire")
+  rezervime   Rezervim[]
+}
+
+model Rezervim {
+  id          Int           @id @default(autoincrement())
+  anetarId    Int
+  anetar      Anetar        @relation(fields: [anetarId], references: [id])
+  vendId      Int
+  vend        Vend          @relation(fields: [vendId], references: [id])
+  data        DateTime
+  oraFillimit  DateTime
+  oraMbarimit  DateTime
+  status      String        @default("aktiv")
+  kodiQR      String?
+  checkIn     Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+}
