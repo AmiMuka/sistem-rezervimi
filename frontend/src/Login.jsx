@@ -35,6 +35,12 @@ function Login({ onLogin }) {
           Hyr me eAlbania (simulim)
         </button>
       </form>
+      <button
+        onClick={() => onLogin('BIBLIOTEKAR')}
+        style={{ marginTop: 15, padding: 10, background: 'transparent', border: '1px solid #555', color: '#aaa', borderRadius: 6, cursor: 'pointer', width: '100%' }}
+      >
+        🧑‍💼 Hyr si Bibliotekar (demo)
+      </button>
     </div>
   );
 }

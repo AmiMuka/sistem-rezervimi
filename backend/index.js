@@ -176,6 +176,46 @@ app.get('/', (req, res) => {
   res.send('Backend po punon!');
 });
 
+// Merr të gjitha rezervimet aktive (për dashboard-in e bibliotekarit)
+app.get('/api/rezervime-aktive', async (req, res) => {
+  try {
+    const rezervime = await prisma.rezervim.findMany({
+      where: { status: 'aktiv' },
+      include: { vend: true, anetar: true },
+      orderBy: { oraFillimit: 'asc' },
+    });
+    res.json(rezervime);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në marrjen e rezervimeve aktive' });
+  }
+});
+
+// Check-in me kod QR
+app.post('/api/checkin', async (req, res) => {
+  try {
+    const { kodiQR } = req.body;
+    const rezervim = await prisma.rezervim.findFirst({
+      where: { kodiQR, status: 'aktiv' },
+      include: { vend: true, anetar: true },
+    });
+    if (!rezervim) {
+      return res.status(404).json({ error: 'Kod i pavlefshëm ose rezervim jo aktiv' });
+    }
+    if (rezervim.checkIn) {
+      return res.status(400).json({ error: 'Check-in është bërë tashmë për këtë rezervim' });
+    }
+    const rezervimUpdated = await prisma.rezervim.update({
+      where: { id: rezervim.id },
+      data: { checkIn: true },
+    });
+    res.json({ mesazh: `Check-in u krye për ${rezervim.anetar.emer} ${rezervim.anetar.mbiemer}, vendi ${rezervim.vend.kodi}`, rezervim: rezervimUpdated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në check-in' });
+  }
+});
+
 // Merr të gjitha vendet (për hartën)
 app.get('/api/vende', async (req, res) => {
   try {

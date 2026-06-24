@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import Login from './Login';
 import Harta from './Harta';
+import Bibliotekar from './Bibliotekar';
 
 function App() {
   const [anetar, setAnetar] = useState(null);
 
   if (!anetar) {
     return <Login onLogin={setAnetar} />;
+  }
+
+  if (anetar === 'BIBLIOTEKAR') {
+    return <Bibliotekar onDal={() => setAnetar(null)} />;
   }
 
   return (
