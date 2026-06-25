@@ -29,10 +29,10 @@ function Bibliotekar({ onDal }) {
 
   return (
     <div style={{ padding: 30, maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2>🧑‍💼 Dashboard i Bibliotekarit</h2>
-        <button onClick={onDal} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>Dil</button>
-      </div>
+      <div className="header-bar">
+  <div className="logo">🧑‍💼 Paneli i Bibliotekarit</div>
+  <button onClick={onDal}>Dil</button>
+</div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
         <input
