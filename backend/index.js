@@ -13,6 +13,21 @@ app.use(express.json());
 
 const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
+const cron = require('node-cron');
+const nodemailer = require('nodemailer');
+
+let transporter;
+async function setupEmail() {
+  const testAccount = await nodemailer.createTestAccount();
+  transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: { user: testAccount.user, pass: testAccount.pass },
+  });
+  console.log('📧 Email test gati:', testAccount.user);
+}
+setupEmail();
 
 // Mock eAlbania login — simulon autentikimin
 app.post('/api/auth/mock-login', async (req, res) => {
@@ -103,21 +118,36 @@ app.post('/api/rezervime', async (req, res) => {
       },
     });
 
-    // Gjenero QR kod (string unik bazuar te ID e rezervimit)
     const qrText = `BKSH-REZ-${rezervim.id}-${vendId}-${anetarId}`;
     const qrImage = await QRCode.toDataURL(qrText);
-
-    // Ruaj QR kodin te rezervimi
     const rezervimMeQR = await prisma.rezervim.update({
       where: { id: rezervim.id },
       data: { kodiQR: qrText },
     });
 
-    // Ndrysho statusin e vendit
     await prisma.vend.update({
       where: { id: vendId },
       data: { status: 'rezervuar' },
     });
+
+    // Dërgo email konfirmimi (Ethereal - test)
+    const anetarInfo = await prisma.anetar.findUnique({ where: { id: anetarId } });
+    if (transporter) {
+      const info = await transporter.sendMail({
+        from: '"BKSH Bibliotek" <no-reply@bksh.al>',
+        to: anetarInfo.email,
+        subject: 'Konfirmimi i Rezervimit - BKSH',
+        html: `
+          <h2>Rezervimi u konfirmua! ✅</h2>
+          <p><strong>Vendi:</strong> ${vend.kodi}</p>
+          <p><strong>Data:</strong> ${data}</p>
+          <p><strong>Ora:</strong> ${new Date(oraFillimit).toLocaleTimeString('sq-AL')} - ${new Date(oraMbarimit).toLocaleTimeString('sq-AL')}</p>
+          <p>QR Kodi yt:</p>
+          <img src="${qrImage}" width="150" />
+        `,
+      });
+      console.log('📧 Email Preview URL:', nodemailer.getTestMessageUrl(info));
+    }
 
     res.json({ ...rezervimMeQR, qrImage });
   } catch (err) {
@@ -168,6 +198,38 @@ app.post('/api/rezervime/:id/anulo', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Gabim në anulim' });
+  }
+});
+
+// Statistika për admin
+app.get('/api/admin/statistika', async (req, res) => {
+  try {
+    const totalVende = await prisma.vend.count();
+    const veNdeRezervuara = await prisma.vend.count({ where: { status: { not: 'i_lire' } } });
+    const totalRezervime = await prisma.rezervim.count();
+    const noShowCount = await prisma.rezervim.count({ where: { status: 'no_show' } });
+    const totalAnetare = await prisma.anetar.count();
+
+    res.json({ totalVende, veNdeRezervuara, totalRezervime, noShowCount, totalAnetare });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim te statistikat' });
+  }
+});
+
+// Blloko/zhblloko një vend (admin)
+app.post('/api/admin/vende/:id/toggle-bllokim', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const vend = await prisma.vend.findUnique({ where: { id } });
+    if (!vend) return res.status(404).json({ error: 'Vendi nuk ekziston' });
+
+    const statusRi = vend.status === 'bllokuar' ? 'i_lire' : 'bllokuar';
+    const vendUpdated = await prisma.vend.update({ where: { id }, data: { status: statusRi } });
+    res.json(vendUpdated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gabim në bllokim' });
   }
 });
 
@@ -226,6 +288,31 @@ app.get('/api/vende', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Gabim në marrjen e vendeve' });
+  }
+});
+
+// Kontrollo no-show çdo minutë
+cron.schedule('* * * * *', async () => {
+  try {
+    const tani = new Date();
+    const rezervimet = await prisma.rezervim.findMany({
+      where: { status: 'aktiv', checkIn: false },
+    });
+
+    for (const r of rezervimet) {
+      const minutaQëKaluan = (tani - new Date(r.oraFillimit)) / (1000 * 60);
+      if (minutaQëKaluan > 15) {
+        await prisma.rezervim.update({ where: { id: r.id }, data: { status: 'no_show' } });
+        await prisma.vend.update({ where: { id: r.vendId }, data: { status: 'i_lire' } });
+        await prisma.anetar.update({
+          where: { id: r.anetarId },
+          data: { penalitete: { increment: 1 } },
+        });
+        console.log(`No-show: rezervimi #${r.id} (vendi ${r.vendId}) u anulua automatikisht, +1 penalitet`);
+      }
+    }
+  } catch (err) {
+    console.error('Gabim te cron job-i i no-show:', err);
   }
 });
 

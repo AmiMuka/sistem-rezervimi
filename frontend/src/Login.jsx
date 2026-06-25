@@ -41,6 +41,12 @@ function Login({ onLogin }) {
       >
         🧑‍💼 Hyr si Bibliotekar (demo)
       </button>
+      <button
+  onClick={() => onLogin('ADMIN')}
+  style={{ marginTop: 8, padding: 10, background: 'transparent', border: '1px solid #555', color: '#aaa', borderRadius: 6, cursor: 'pointer', width: '100%' }}
+>
+  ⚙️ Hyr si Admin (demo)
+</button>
     </div>
   );
 }
